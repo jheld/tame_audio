@@ -58,9 +58,9 @@ def tame_driver(driver_shared_data=None):
                 elif current_volume < min_db:
                     print('raising')
                     default_mixer.setvolume(current_volume + 3)
-                elif int(current_decibel_level) in [_ for _ in xrange(int(sweet_spot) - 20, int(sweet_spot) - 5)]:
+                elif (int(current_decibel_level) < int(sweet_spot) - 8) and sweet_spot - 8 > min_db:
                     default_mixer.setvolume(current_volume + 3)
-                elif int(current_decibel_level) in [_ for _ in xrange(int(sweet_spot) + 5, int(sweet_spot) + 20)]:
+                elif (int(current_decibel_level) > int(sweet_spot) + 8) and sweet_spot + 8 < max_db:
                     default_mixer.setvolume(current_volume - 3)
 
             except alsaaudio.ALSAAudioError as e:
@@ -74,13 +74,29 @@ def tame_driver(driver_shared_data=None):
 def index():
     audio_data = json.loads(list(bottle.request.POST.keys())[0])
     global driver_shared_data
-    driver_shared_data['db'] = float(audio_data['value'])
-    print('REST db: {}'.format(driver_shared_data['db']))
+    print('Full request: {}'.format(audio_data))
+    print('Received REST db: {}'.format(int(audio_data['value'])))
+    driver_shared_data['db'] = int(audio_data['value'])
 
 @bottle.route('/')
 @bottle.route('')
 def index_get():
     global driver_shared_data
+    can_raise = json.loads(bottle.request.GET.get('raise', 'false'))
+    if can_raise:
+        driver_shared_data['db'] = driver_shared_data.get('db', 35) + 5
+    can_lower = json.loads(bottle.request.GET.get('lower', 'false'))
+    if can_lower:
+        driver_shared_data['db'] = driver_shared_data.get('db', 35) - 5
+    can_raise_max = json.loads(bottle.request.GET.get('raise_max', 'false'))
+    if can_raise_max:
+        min_db, max_db = driver_shared_data.get('range', (20, 50, ))
+        driver_shared_data['range' ] = min_db, max_db + 5
+    can_lower_min = json.loads(bottle.request.GET.get('lower_min', 'false'))
+    if can_lower_min:
+        min_db, max_db = driver_shared_data.get('range', (20, 50, ))
+        driver_shared_data['range' ] = min_db - 5, max_db
+    
     stop = json.loads(bottle.request.GET.get('stop', 'false'))
     if stop:
         driver_shared_data['stop'] = True
@@ -99,8 +115,8 @@ def index_get():
     upper_range = json.loads(bottle.request.GET.get('too_high', 'false'))
     if upper_range:
         new_range = driver_shared_data.get('range', (20, 50, ))
-        new_value = driver_shared_data.get('db', 35)
         min_db, max_db = new_range
+        new_value = (max_db - 5) or driver_shared_data.get('db', 35)
         max_db = new_value
         # if min_db < max_db:
         #     max_db = new_value - 5
@@ -112,8 +128,8 @@ def index_get():
     lower_range = json.loads(bottle.request.GET.get('too_low', 'false'))
     if lower_range:
         new_range = driver_shared_data.get('range', (20, 50, ))
-        new_value = driver_shared_data.get('db', 35)
         min_db, max_db = new_range
+        new_value = (min_db + 5) or driver_shared_data.get('db', 35)
         min_db = new_value
         # if max_db < min_db:
         #     min_db = new_value - 5
@@ -125,7 +141,7 @@ def index_get():
     just_right = json.loads(bottle.request.GET.get('just_right', 'true'))
     if just_right:
         driver_shared_data['sweet_spot'] = driver_shared_data.get('db', 35)
-    return json.dumps(driver_shared_data.get('db', 'NA'))
+    return json.dumps([['cur_db', driver_shared_data.get('db', 'NA')], ['range', driver_shared_data.get('range', (20, 50, ))]])
 
 
 tame_thread = threading.Thread(target=tame_driver, kwargs=dict(driver_shared_data=driver_shared_data))
