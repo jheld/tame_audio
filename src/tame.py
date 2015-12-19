@@ -12,7 +12,7 @@ import alsaaudio
 
 from math import log10
 
-driver_shared_data = {}
+driver_shared_data = {'cycle_time': 3}
 
 def audio_meter(driver_shared_data):
     while True:
@@ -66,7 +66,7 @@ def tame_driver(driver_shared_data=None):
 
             except alsaaudio.ALSAAudioError as e:
                 print(e)
-            time.sleep(3)
+            time.sleep(driver_shared_data.get('cycle_time', 3))
         else:
             time.sleep(1)
 
@@ -83,6 +83,9 @@ def index():
 @bottle.route('')
 def index_get():
     global driver_shared_data
+    cycle_time = int(json.loads(bottle.request.GET.get('cycle_time', '-1')))
+    if cycle_time > -1:
+        driver_shared_data['cycle_time'] = cycle_time
     can_raise = json.loads(bottle.request.GET.get('raise', 'false'))
     if can_raise:
         driver_shared_data['db'] = driver_shared_data.get('db', 35) + 5
@@ -124,6 +127,8 @@ def index_get():
         #     min_db = min_db if max_db >= min_db else max_db - 5
         # elif min_db > max_db:
         #     max_db = new_value + 5
+        if max_db < min_db:
+            min_db = max_db - 5
         new_range = min_db, max_db
         driver_shared_data['range'] = new_range
     lower_range = json.loads(bottle.request.GET.get('too_low', 'false'))
@@ -137,6 +142,8 @@ def index_get():
         #     max_db = max_db if min_db >= max_db else min_db - 5
         # elif max_db > min_db:
         #     min_db = new_value + 5
+        if min_db > max_db:
+            max_db = min_db + 5
         new_range = min_db, max_db
         driver_shared_data['range'] = new_range
     just_right = json.loads(bottle.request.GET.get('just_right', 'true'))
