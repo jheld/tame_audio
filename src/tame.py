@@ -6,8 +6,9 @@ import argparse
 
 import bottle
 import alsaaudio
-import soundmeter
-from soundmeter.monitor import Meter
+# has issue on the pi
+# import soundmeter
+# from soundmeter.monitor import Meter
 
 from math import log10
 
