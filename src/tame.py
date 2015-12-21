@@ -1,6 +1,7 @@
 import time
 import threading
-import json
+import os
+import ujson
 import traceback
 import argparse
 
@@ -70,53 +71,53 @@ def tame_driver(driver_shared_data=None):
         else:
             time.sleep(1)
 
-@bottle.route('/', method='POST')
-@bottle.route('', method='POST')
+@bottle.route('/adjust', method='POST')
+@bottle.route('/adjust/', method='POST')
 def index():
-    audio_data = json.loads(list(bottle.request.POST.keys())[0])
+    audio_data = ujson.loads(list(bottle.request.POST.keys())[0])
     global driver_shared_data
     print('Full request: {}'.format(audio_data))
     print('Received REST db: {}'.format(int(audio_data['value'])))
     driver_shared_data['db'] = int(audio_data['value'])
 
-@bottle.route('/')
-@bottle.route('')
+@bottle.route('/adjust/')
+@bottle.route('/adjust')
 def index_get():
     global driver_shared_data
-    cycle_time = int(json.loads(bottle.request.GET.get('cycle_time', '-1')))
+    cycle_time = int(ujson.loads(bottle.request.GET.get('cycle_time', '-1')))
     if cycle_time > -1:
         driver_shared_data['cycle_time'] = cycle_time
-    can_raise = json.loads(bottle.request.GET.get('raise', 'false'))
+    can_raise = ujson.loads(bottle.request.GET.get('raise', 'false'))
     if can_raise:
         driver_shared_data['db'] = driver_shared_data.get('db', 35) + 5
-    can_lower = json.loads(bottle.request.GET.get('lower', 'false'))
+    can_lower = ujson.loads(bottle.request.GET.get('lower', 'false'))
     if can_lower:
         driver_shared_data['db'] = driver_shared_data.get('db', 35) - 5
-    can_raise_max = json.loads(bottle.request.GET.get('raise_max', 'false'))
+    can_raise_max = ujson.loads(bottle.request.GET.get('raise_max', 'false'))
     if can_raise_max:
         min_db, max_db = driver_shared_data.get('range', (20, 50, ))
         driver_shared_data['range' ] = min_db, max_db + 5
-    can_lower_min = json.loads(bottle.request.GET.get('lower_min', 'false'))
+    can_lower_min = ujson.loads(bottle.request.GET.get('lower_min', 'false'))
     if can_lower_min:
         min_db, max_db = driver_shared_data.get('range', (20, 50, ))
         driver_shared_data['range' ] = min_db - 5, max_db
     
-    stop = json.loads(bottle.request.GET.get('stop', 'false'))
+    stop = ujson.loads(bottle.request.GET.get('stop', 'false'))
     if stop:
         driver_shared_data['stop'] = True
         driver_shared_data['start'] = False
-    start = json.loads(bottle.request.GET.get('start', 'false'))
+    start = ujson.loads(bottle.request.GET.get('start', 'false'))
     if start:
         driver_shared_data['stop'] = False
         driver_shared_data['start'] = True
 
-    reset = json.loads(bottle.request.GET.get('reset', 'false'))
+    reset = ujson.loads(bottle.request.GET.get('reset', 'false'))
     if reset:
         driver_shared_data['stop'] = False
         driver_shared_data['start'] = False
         driver_shared_data['range' ] = (20, 50)
         
-    upper_range = json.loads(bottle.request.GET.get('too_high', 'false'))
+    upper_range = ujson.loads(bottle.request.GET.get('too_high', 'false'))
     if upper_range:
         new_range = driver_shared_data.get('range', (20, 50, ))
         min_db, max_db = new_range
@@ -131,7 +132,7 @@ def index_get():
             min_db = max_db - 5
         new_range = min_db, max_db
         driver_shared_data['range'] = new_range
-    lower_range = json.loads(bottle.request.GET.get('too_low', 'false'))
+    lower_range = ujson.loads(bottle.request.GET.get('too_low', 'false'))
     if lower_range:
         new_range = driver_shared_data.get('range', (20, 50, ))
         min_db, max_db = new_range
@@ -146,10 +147,69 @@ def index_get():
             max_db = min_db + 5
         new_range = min_db, max_db
         driver_shared_data['range'] = new_range
-    just_right = json.loads(bottle.request.GET.get('just_right', 'true'))
+    just_right = ujson.loads(bottle.request.GET.get('just_right', 'true'))
     if just_right:
         driver_shared_data['sweet_spot'] = driver_shared_data.get('db', 35)
-    return json.dumps([['cur_db', driver_shared_data.get('db', 'NA')], ['range', driver_shared_data.get('range', (20, 50, ))]])
+    return ujson.dumps([['cur_db', driver_shared_data.get('db', 'NA')], ['range', driver_shared_data.get('range', (20, 50, ))]])
+
+
+@bottle.route('/static/<filename>')
+def server_static(filename):
+    return bottle.static_file(filename, root='./')
+
+@bottle.route('/hello')
+def hello():
+    if not os.path.exists('./audio_file.json'):
+        open('./audio_file.json', 'wb').write('{}')
+    audio_data = ujson.load(open('./audio_file.json', 'rbU'))
+    mor_max = int(audio_data.get('MorMax', 50))
+    mor_min = int(audio_data.get('MorMin', 20))
+    eve_max = int(audio_data.get('EveMax', 50))
+    eve_min = int(audio_data.get('EveMin', 20))
+    nig_max = int(audio_data.get('NigMax', 50))
+    nig_min = int(audio_data.get('NigMin', 20))
+
+    return bottle.template('./firstpg.tpl', MorMin=mor_min, MorMax=mor_max, EveMin=eve_min, EveMax=eve_max, NigMin=nig_min, NigMax=nig_max)
+
+@bottle.route('/settings', method ='Get')
+def hello1():
+        if not os.path.exists('./audio_file.json'):
+            open('./audio_file.json', 'wb').write('{}')
+        audio_data = ujson.load(open('./audio_file.json', 'rbU'))
+
+    	MorMax = audio_data.get('MorMax', 50) 
+	MorMin = audio_data.get('MorMin', 20)
+	EveMax= audio_data.get('EveMax', 50) 
+	EveMin = audio_data.get('EveMin', 20) 
+	NigMax= audio_data.get('NigMax', 50) 
+	NigMin = audio_data.get('NigMin', 20)
+
+	return bottle.template('./secpg.tpl', MorMin=MorMin, MorMax=MorMax, EveMin=EveMin, EveMax=EveMax, NigMin=NigMin, NigMax=NigMax)
+
+
+@bottle.route('/updatepg')
+def hello2():
+    mor_max = bottle.request.query.get('MorMax')
+    mor_min = bottle.request.query.get('MorMin')
+    eve_max = bottle.request.query.get('EveMax')
+    eve_min = bottle.request.query.get('EveMin')
+    nig_max = bottle.request.query.get('NigMax')
+    nig_min = bottle.request.query.get('NigMin')
+
+    if not os.path.exists('./audio_file.json'):
+        open('./audio_file.json', 'wb').write('{}')
+    audio_data = ujson.load(open('./audio_file.json', 'rbU'))
+    audio_data['MorMax'] = int(mor_max)
+    audio_data['MorMin'] = int(mor_min)
+    audio_data['EveMax'] = int(eve_max)
+    audio_data['EveMin'] = int(eve_min)
+    audio_data['NigMax'] = int(nig_max)
+    audio_data['NigMin'] = int(nig_min)
+
+    ujson.dump(audio_data, open('./audio_file.json', 'wb'))
+    bottle.redirect('/hello')
+   
+
 
 
 tame_thread = threading.Thread(target=tame_driver, kwargs=dict(driver_shared_data=driver_shared_data))
