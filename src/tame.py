@@ -34,13 +34,67 @@ def tame_driver(driver_shared_data=None):
     """
     if driver_shared_data is None:
         driver_shared_data = {}
+    if not os.path.exists('./audio_file.json'):
+        open('./audio_file.json', 'wb').write('{}')
+    orig_config = ujson.load(open('./audio_file.json', 'rbU'))
+    cur_time = time.localtime()
+    if 7 <= cur_time.tm_hour <= 16:
+        if (cur_time.tm_min < 1 and cur_time.tm_hour == 16) or cur_time.tm_hour < 16:
+            min_key = 'MorMin'
+            max_key = 'MorMax'
+        else:
+            min_key = 'EveMin'
+            max_key = 'EveMax'
+    elif 0 <= cur_time.tm_hour <= 16:
+        if (cur_time.tm_min < 1 and cur_time.tm_hour == 0) or cur_time.tm_hour >= 16:
+            min_key = 'EveMin'
+            max_key = 'EveMax'
+        else:
+            min_key = 'NigMin'
+            max_key = 'NigMax'
+    else:
+        min_key = 'NigMin'
+        max_key = 'NigMax'
+    config_min = int(orig_config.get(min_key, 20))
+    config_max = int(orig_config.get(max_key, 50))
+    last_update_time = time.ctime(os.path.getmtime('./audio_file.json'))
     while True:
         stopped = driver_shared_data.get('stop', False)
         if not stopped:
+            cur_time = time.localtime()
+            if 7 <= cur_time.tm_hour <= 16:
+                if (cur_time.tm_min < 1 and cur_time.tm_hour == 16) or cur_time.tm_hour < 16:
+                    min_key = 'MorMin'
+                    max_key = 'MorMax'
+                else:
+                    min_key = 'EveMin'
+                    max_key = 'EveMax'
+            elif 0 <= cur_time.tm_hour >= 16:
+                if (cur_time.tm_min < 1 and cur_time.tm_hour == 0) or cur_time.tm_hour >= 16:
+                    min_key = 'EveMin'
+                    max_key = 'EveMax'
+                else:
+                    min_key = 'NigMin'
+                    max_key = 'NigMax'
+            else:
+                min_key = 'NigMin'
+                max_key = 'NigMax'
+            config_min = int(orig_config.get(min_key, 20))
+            config_max = int(orig_config.get(max_key, 50))
+            if not time.ctime(os.path.getmtime('./audio_file.json')) == last_update_time:
+                last_update_time = time.ctime(os.path.getmtime('./audio_file.json'))
+                orig_config = ujson.load(open('./audio_file.json', 'rbU'))
+                print(orig_config)
+                print(min_key, max_key)
+                config_min = int(orig_config.get(min_key, 20))
+                config_max = int(orig_config.get(max_key, 50))
+                driver_shared_data['range'] = config_min, config_max
+            else:
+                print('the same')
             default_mixer = alsaaudio.Mixer()
             # print('have data: {}'.format(driver_shared_data))
             adjustment_mode = driver_shared_data.get('mode', 'linear')
-            preferred_audio_range = driver_shared_data.get('range', (20, 50, ))
+            preferred_audio_range = driver_shared_data.get('range', (config_min, config_max, ))
             min_db, max_db = preferred_audio_range
             current_decibel_level = driver_shared_data.get('db', 35)
             current_volume = int(default_mixer.getvolume()[0])
